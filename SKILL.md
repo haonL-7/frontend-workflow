@@ -1,257 +1,381 @@
 ---
 name: frontend-workflow
-description: Frontend development workflow engine. Breaks down UI features into implementable tasks, manages design-to-code handoffs, provides structured code review checklists, bug triage workflows, performance optimization guides, and deployment checklists. Trigger when planning frontend features, reviewing code, debugging UI bugs, optimizing performance, or preparing deployments.
+description: Multi-site series development workflow engine. New-site onboarding, cross-site consistency audits, shared-component versioning, feature breakdown, code review, bug triage, performance, and deployment — all series-aware. MANUAL TRIGGER ONLY — invoke explicitly via /skill frontend-workflow. Do NOT auto-trigger.
+trigger: manual
 ---
 
-# frontend-workflow — Frontend Development Workflow Engine
+# frontend-workflow — Multi-Site Series Execution Engine
 
-A structured workflow engine for planning, executing, and tracking frontend development tasks. Use this skill to break down complex UI features into manageable steps, track component implementation progress, and ensure quality handoffs.
+This is NOT a general-purpose checklist. It is the operating manual for building and maintaining
+a SERIES of websites that share components, design tokens, and infrastructure. Every workflow
+below assumes you are running multiple sites, not one.
 
-## When to Use
+---
 
-- Breaking down a frontend feature into implementable tasks
-- Tracking multi-component UI development progress
-- Coordinating design-to-development handoffs
-- Planning responsive/mobile-first implementations
-- Managing frontend code review and QA workflows
-- Setting up frontend CI/CD and deployment pipelines
+## 1. New Site Onboarding
 
-## Workflow: Feature Breakdown
+When starting a new site in the series:
 
-### Step 1 — Requirements Analysis
-
-Before writing any code, clarify:
+### Step 1 — Bootstrap
 ```
-- What user problem does this solve?
-- What are the acceptance criteria?
-- What states does this UI have? (loading, empty, error, edge cases)
-- What browsers/devices must be supported?
-- Are there accessibility requirements (WCAG level)?
+□ Clone the series starter template (NOT create-next-app from scratch)
+□ Run: git clone <series-starter> <new-site-name> && cd <new-site-name>
+□ Run: npm install
+□ Update site name in package.json, .env.example, metadata
 ```
 
-### Step 2 — Component Tree Design
-
-Map the component hierarchy:
+### Step 2 — Design Token Sync
 ```
-Page / Route
-├── Layout
-│   ├── Header
-│   │   ├── Logo
-│   │   ├── Navigation
-│   │   └── UserMenu
-│   ├── Main
-│   │   ├── Sidebar (optional)
-│   │   └── Content
-│   │       ├── FeatureComponent
-│   │       └── SubFeatureComponent
-│   └── Footer
-└── Modal (portaled)
+□ Verify tokens.css imports the shared token file from the series monorepo / shared package
+□ If this site has a unique primary color: override --color-primary in site-local tokens
+□ All OTHER tokens must remain inherited — do NOT re-define spacing, radius, shadows locally
+□ Run: npm run tokens:validate (or visual check: does the starter look right?)
 ```
 
-### Step 3 — Task Breakdown Template
-
-For each component, create a task card:
+### Step 3 — Site Registry
+Add the new site to the series site registry (a markdown table or JSON file in the shared repo):
 
 ```yaml
+- name: "new-site"
+  url: "https://new-site.example.com"
+  repo: "https://github.com/<org>/new-site"
+  primary_color: "#xxxxxx"
+  description: "What this site does"
+  status: "in-development"  # in-development → staging → production
+  created: "YYYY-MM-DD"
+```
+
+### Step 4 — Shared Component Verification
+```
+□ Run the shared component test suite against this site: npm test -- --scope=@series/ui
+□ Verify all mandatory components render: Modal, Form, ErrorBlock, Skeleton, EmptyState
+□ If any Mandatory component breaks: fix the SHARED component, not this site's override
+```
+
+### Step 5 — First Deploy
+```
+□ Build: npm run build
+□ Lint: npm run lint
+□ Type-check: npx tsc --noEmit
+□ Deploy to staging
+□ Run cross-site smoke tests (check shared components render identically vs other sites)
+□ Promote to production when ready
+```
+
+---
+
+## 2. Feature Breakdown (Series-Aware)
+
+For each feature, first ask: **does this belong in the shared library or this specific site?**
+
+```
+Decision tree:
+  Is this feature identical across 2+ sites?
+    YES → Build it in @series/ui (shared), then consume in each site
+    NO  → Build it in the specific site
+
+  Does this feature have the SAME behavior but DIFFERENT data per site?
+    YES → Build the component in @series/ui, pass data as props/config
+    NO  → Build separately per site
+```
+
+### Task Card Template (Series-Aware)
+```yaml
 Task:
-  id: "feat-001"
-  component: "UserMenu"
-  priority: P1  # P1=blocking, P2=important, P3=nice-to-have
-  status: todo  # todo → in-progress → review → done
-  dependencies: ["feat-000: AuthContext"]
-  estimated_hours: 2
-  acceptance:
-    - "Dropdown opens on click"
-    - "Keyboard navigation (↑↓ Enter Esc)"
-    - "Closes on outside click"
-    - "ARIA labels for screen readers"
-    - "Responsive: collapses to icon on mobile"
+  id: "feat-042"
+  title: "User dashboard widget"
+  location: "@series/ui"  # or "site-name"
+  sites_affected: ["site-a", "site-b", "site-c"]
+  priority: P1
+  status: todo
+  depends_on: ["feat-041: Auth context"]
+  consistency_check:
+    - "Modal behavior matches across all affected sites"
+    - "Error states use shared ErrorBlock"
+    - "Loading states use shared Skeleton"
+    - "Tokens reference CSS variables, not hardcoded values"
 ```
 
-### Step 4 — Implementation Order
+---
 
-Follow the dependency graph:
-1. **Foundation** — theme, design tokens, global styles, layout
-2. **Atomic Components** — Button, Input, Badge, Icon (no dependencies)
-3. **Composite Components** — Form, Modal, Card (depends on atomic)
-4. **Feature Components** — specific business features (depends on composite)
-5. **Pages / Routes** — assemble components, add data fetching
-6. **Polish** — animations, transitions, loading states, error boundaries
+## 3. Cross-Site Consistency Audit
 
-## Workflow: Design-to-Code Handoff
+Run this before any site goes to production, or when a shared component changes.
 
-### Design Spec Extraction
-- Extract: colors, typography, spacing, breakpoints
-- Map design tokens to CSS custom properties or Tailwind config
-- Identify reusable patterns vs one-off styles
-
-### Component Audit
-- List all distinct UI elements in the design
-- Group by reusability
-- Flag potential a11y issues early (contrast, focus states, labels)
-
-### Implementation Checklist
+### Audit Checklist
 ```
-□ Design tokens → CSS variables / Tailwind config
-□ Global styles (reset, base typography, scrollbar)
-□ Layout component (responsive grid/flex)
-□ Atomic components (Button, Input, Select, etc.)
-□ Accessibility audit (axe-core / Lighthouse)
-□ Responsive testing (mobile → tablet → desktop)
-□ Cross-browser testing
-□ Performance check (Lighthouse > 90)
+□ Modal: Esc closes, overlay click closes, focus trap works, body scroll locked
+    → Test on: (list all sites)
+    → Command: npx playwright test --grep "modal-consistency"
+
+□ Form: inputs are controlled, validation errors appear identically, submit loading state works
+    → Test on: (list all sites)
+    → Command: npx playwright test --grep "form-consistency"
+
+□ ErrorBlock: looks identical, retry button works, alert role present
+    → Visual diff vs reference screenshots
+    → Command: npx playwright test --grep "error-visual"
+
+□ Skeleton: same animation, same shape, no layout shift on data arrival
+    → Visual diff vs reference screenshots
+
+□ EmptyState: same layout (icon + title + desc + action), same spacing
+    → Visual diff vs reference screenshots
+
+□ Design tokens: no hardcoded colors/px found via grep
+    → Command: grep -rn '#[0-9a-fA-F]\{3,6\}' src/ --include='*.tsx' | grep -v 'tokens'
+    → Command: grep -rn '[0-9]\+px' src/ --include='*.tsx' | grep -v 'tokens'
+
+□ Transitions: 150ms/200ms/300ms timing consistent
+    → Command: grep -rn 'transition' src/ --include='*.css'
+
+□ Bundle: no site accidentally bundles another site's code
+    → Command: npm run build -- --analyze
 ```
 
-## Workflow: Frontend Code Review Checklist
+---
 
-### Code Quality
-- [ ] Components are single-responsibility
-- [ ] No props drilling beyond 2 levels
-- [ ] Custom hooks extracted where logic is reused
-- [ ] TypeScript types are explicit (no `any`)
-- [ ] No inline styles (use CSS modules / Tailwind / styled)
-- [ ] No hardcoded strings (use i18n or constants)
+## 4. Shared Component Versioning
 
-### Performance
-- [ ] No unnecessary re-renders (React.memo, useMemo, useCallback)
-- [ ] Images are lazy-loaded and optimized
-- [ ] Bundle size is checked (no heavy imports)
-- [ ] No memory leaks (cleanup in useEffect)
-- [ ] API calls are debounced where appropriate
+When changing a shared component (`@series/ui`):
 
-### Accessibility
-- [ ] Semantic HTML used (`<button>` not `<div onClick>`)
-- [ ] All images have alt text
-- [ ] Form inputs have labels
-- [ ] Color contrast meets WCAG AA (4.5:1)
-- [ ] Focus management works (modals trap focus)
-- [ ] Screen reader tested
+```
+1. Branch: git checkout -b feat/component-change
+2. Change the component in @series/ui
+3. Run the shared-component test suite
+4. Run cross-site E2E tests against ALL sites that use this component
+5. Bump version: npm version patch|minor|major (semver — see below)
+6. Update CHANGELOG.md with migration notes if breaking
+7. PR review → merge
+8. Each site runs: npm update @series/ui && npm test
+```
 
-### Testing
-- [ ] Critical paths have unit tests
-- [ ] User interactions tested (click, type, navigate)
-- [ ] Error states tested
-- [ ] Loading states tested
+### Version Bump Rules
+| Change | Bump |
+|--------|------|
+| Bug fix, same API | `patch` (1.0.0 → 1.0.1) |
+| New prop, backwards-compatible | `minor` (1.0.0 → 1.1.0) |
+| Prop removed, behavior changed | `major` (1.0.0 → 2.0.0) |
 
-## Workflow: Frontend Bug Triage
+---
+
+## 5. Code Review (Series-Aware)
+
+Standard review items PLUS these series-specific checks:
+
+### Series-Specific Review Questions
+```
+□ Is this component in the right place? (@series/ui vs site-local)
+□ If in @series/ui: does it work identically across ALL sites?
+□ If site-local: could it be promoted to @series/ui later?
+□ Are design tokens used (not hardcoded values)?
+□ Are Mandatory components used where applicable (Modal, Form, ErrorBlock, etc)?
+□ Does this change break any other site's visual regression tests?
+□ Is the Site Registry updated if this is a new site?
+```
+
+---
+
+## 6. Bug Triage (Series-Aware)
+
+### Severity in Multi-Site Context
+| Severity | Definition |
+|----------|-----------|
+| S1 | Bug affects ALL sites (shared component crash) |
+| S2 | Bug affects 2+ sites |
+| S3 | Bug affects a single site |
+| S4 | Visual glitch on a single site |
 
 ### Bug Report Template
 ```yaml
 Bug:
   id: "bug-042"
-  severity: S1  # S1=crash, S2=broken-feature, S3=visual-glitch, S4=enhancement
-  component: "UserMenu"
+  severity: S2
+  component: "@series/ui/Modal"
+  sites_affected: ["site-a", "site-b"]
+  sites_unaffected: ["site-c"]
   environment: "Chrome 125 / macOS / 1920x1080"
   reproduction_steps:
-    - "1. Log in as admin"
-    - "2. Click user menu icon"
-    - "3. Select 'Settings'"
-  expected: "Navigates to /settings"
-  actual: "Dropdown closes, no navigation"
-  console_errors: "TypeError: Cannot read property 'name' of undefined"
+    - "1. Open modal on site-a"
+    - "2. Press Tab repeatedly"
+  expected: "Focus stays trapped inside modal"
+  actual: "Focus escapes to browser chrome on 5th Tab press"
+  root_cause_hypothesis: "Focus trap selector missing a new button variant"
 ```
 
-### Debug Workflow
-1. **Reproduce** — confirm the bug with exact steps
-2. **Isolate** — find the smallest reproduction case
-3. **Diagnose** — check console, network, React DevTools
-4. **Fix** — minimal change that addresses root cause
-5. **Test** — verify fix + check for regressions
-6. **Document** — add a test case to prevent recurrence
+---
 
-## Workflow: Frontend Performance Optimization
+## 7. Performance Optimization (Series-Aware)
 
-### Audit Steps
-1. Run Lighthouse audit (Performance tab)
-2. Check bundle size (`npm run build -- --analyze` or `npx vite-bundle-visualizer`)
-3. Profile with React DevTools Profiler
-4. Check network waterfall for slow requests
+### Shared Optimization Impact
+When you optimize a shared component, the benefit multiplies across all sites.
+Prioritize shared-component optimizations over site-specific ones.
 
-### Common Fixes
-| Problem | Solution |
-|---------|----------|
-| Large bundle | Code splitting: `React.lazy()` + `Suspense` |
-| Slow re-renders | `React.memo`, `useMemo`, `useCallback` |
-| Heavy images | Next.js `<Image>`, lazy loading, WebP format |
-| Slow API calls | Debounce search, cache responses, optimistic UI |
-| CLS (layout shift) | Set explicit width/height on images |
-| Slow FCP | Critical CSS inline, defer non-critical JS |
-| Large deps | Tree-shake imports, use lighter alternatives |
+### Audit Commands (Concrete)
+```
+# Lighthouse (per site)
+npx lighthouse https://site-a.example.com --output html --output-path reports/site-a.html
+npx lighthouse https://site-b.example.com --output html --output-path reports/site-b.html
 
-## Workflow: Deployment Checklist
+# Bundle analysis (per site)
+npm -C apps/site-a run build -- --analyze
+npm -C apps/site-b run build -- --analyze
 
-### Pre-Deploy
-- [ ] All tests passing (`npm test`)
-- [ ] Build succeeds (`npm run build`)
-- [ ] Lint passes (`npm run lint`)
-- [ ] Type check passes (`npx tsc --noEmit`)
-- [ ] Environment variables configured
-- [ ] .env.example updated
+# Shared component bundle impact
+npx vite-bundle-visualizer --scope=@series/ui
 
-### Post-Deploy
-- [ ] Smoke test critical paths
-- [ ] Check error monitoring (Sentry / LogRocket)
-- [ ] Check analytics
-- [ ] Monitor performance metrics
-- [ ] Verify CDN cache is purged (if applicable)
+# Cross-site visual regression
+npx playwright test --config=visual-regression.config.ts
+
+# Unused CSS across all sites
+npx purgecss --css '**/*.css' --content '**/*.tsx' --output dist/
+```
+
+---
+
+## 8. Deployment (Series-Aware)
+
+### Pre-Deploy (any site)
+```
+□ Build passes: npm run build
+□ Lint passes: npm run lint
+□ Type-check passes: npx tsc --noEmit
+□ Tests pass: npm test
+□ Cross-site E2E passes (if shared components changed): npm run test:e2e -- --all-sites
+□ Visual regression diff reviewed and approved
+□ Site Registry status updated (in-development → staging → production)
+```
+
+### Post-Deploy (any site)
+```
+□ Smoke test critical paths on THIS site
+□ Smoke test ONE critical path on OTHER sites (shared infra might have changed)
+□ Check error monitoring (Sentry / LogRocket) across all sites
+□ Verify CDN cache purged
+□ Update Site Registry: status = "production", deployed_at = "YYYY-MM-DD"
+```
+
+### Rollback Decision Matrix
+```
+Did the deploy change a SHARED component?
+  YES → Does it break N sites?
+    1 site broken    → Fix forward (hotfix to @series/ui)
+    2+ sites broken  → ROLLBACK all sites that auto-updated, fix forward
+    0 sites broken   → Monitor, no action
+
+  NO (site-local change only) →
+    Bug found? → Rollback THIS site only, fix forward
+```
+
+---
+
+## 9. Site Registry (Living Document)
+
+Maintain a registry of all sites in the series. Keep this in the shared monorepo root
+as `SITES.md` or `sites.json`.
+
+```yaml
+series:
+  name: "<series-name>"
+  shared_ui_version: "1.2.3"
+  sites:
+    - name: "site-a"
+      url: "https://a.example.com"
+      repo: "https://github.com/<org>/site-a"
+      primary_color: "#3B82F6"
+      status: "production"
+      deployed_at: "2026-06-01"
+      notes: "Main marketing site"
+
+    - name: "site-b"
+      url: "https://b.example.com"
+      repo: "https://github.com/<org>/site-b"
+      primary_color: "#10B981"
+      status: "staging"
+      deployed_at: "2026-06-04"
+      notes: "Docs & support portal"
+
+    - name: "site-c"
+      url: ""
+      repo: "https://github.com/<org>/site-c"
+      primary_color: "#F59E0B"
+      status: "in-development"
+      deployed_at: ""
+      notes: "Admin dashboard — not yet deployed"
+```
+
+---
 
 ## Quick Patterns
 
-### Feature Flag Pattern
+### Feature Flag (shared across series)
 ```tsx
+// In @series/ui
 const useFeatureFlag = (flagName: string): boolean => {
-  // Replace with your feature flag service
-  return process.env[`NEXT_PUBLIC_FF_${flagName}`] === 'true';
+  const searchParams = typeof window !== 'undefined'
+    ? new URLSearchParams(window.location.search)
+    : null;
+  // 1. URL param override (for testing)
+  if (searchParams?.has(`ff_${flagName}`)) {
+    return searchParams.get(`ff_${flagName}`) === '1';
+  }
+  // 2. Environment variable
+  if (typeof process !== 'undefined' && process.env[`NEXT_PUBLIC_FF_${flagName}`]) {
+    return process.env[`NEXT_PUBLIC_FF_${flagName}`] === 'true';
+  }
+  // 3. Default off
+  return false;
 };
-
-// Usage
-function MyComponent() {
-  const showNewUI = useFeatureFlag('NEW_DASHBOARD');
-  if (showNewUI) return <NewDashboard />;
-  return <OldDashboard />;
-}
 ```
 
-### Error Boundary Pattern
+### Error Boundary (every route)
 ```tsx
-class ErrorBoundary extends React.Component<
-  { children: React.ReactNode; fallback?: React.ReactNode },
-  { hasError: boolean; error?: Error }
-> {
-  constructor(props: { children: React.ReactNode; fallback?: React.ReactNode }) {
-    super(props);
-    this.state = { hasError: false };
-  }
-  static getDerivedStateFromError(error: Error) {
+import { Component, type ReactNode, type ErrorInfo } from 'react';
+
+interface ErrorBoundaryProps {
+  children: ReactNode;
+  fallback?: ReactNode;
+  onError?: (error: Error, info: ErrorInfo) => void;
+}
+
+interface ErrorBoundaryState {
+  hasError: boolean;
+  error: Error | null;
+}
+
+class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  state: ErrorBoundaryState = { hasError: false, error: null };
+
+  static getDerivedStateFromError(error: Error): ErrorBoundaryState {
     return { hasError: true, error };
   }
-  componentDidCatch(error: Error, info: React.ErrorInfo) {
-    console.error('ErrorBoundary caught:', error, info);
+
+  componentDidCatch(error: Error, info: ErrorInfo) {
+    this.props.onError?.(error, info);
   }
+
   render() {
     if (this.state.hasError) {
-      return this.props.fallback ?? <div>Something went wrong.</div>;
+      return (
+        this.props.fallback ?? (
+          <div className="flex min-h-[60vh] items-center justify-center p-8">
+            <div className="max-w-md text-center">
+              <h2 className="mb-2 text-xl font-semibold">Something went wrong</h2>
+              <p className="mb-4 text-sm text-[var(--color-text-muted)]">
+                {this.state.error?.message ?? 'An unexpected error occurred'}
+              </p>
+              <button
+                onClick={() => this.setState({ hasError: false, error: null })}
+                className="rounded-[var(--radius-md)] bg-[var(--color-primary)] px-4 py-2 text-sm font-medium text-white"
+              >
+                Try again
+              </button>
+            </div>
+          </div>
+        )
+      );
     }
     return this.props.children;
   }
-}
-```
-
-### Loading Skeleton Pattern
-```tsx
-function Skeleton({ className = '' }: { className?: string }) {
-  return (
-    <div className={`animate-pulse rounded bg-gray-200 ${className}`} />
-  );
-}
-
-function CardSkeleton() {
-  return (
-    <div className="space-y-3 rounded-lg border p-4">
-      <Skeleton className="h-4 w-3/4" />
-      <Skeleton className="h-4 w-1/2" />
-      <Skeleton className="h-20 w-full" />
-    </div>
-  );
 }
 ```
